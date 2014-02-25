@@ -25,6 +25,20 @@ module Playhouse
     #    params: '*world'
     #    description: hello world
     def set_routes(api, app, routes)
+      puts "SETTING ROUTES"
+      app.post '/set' do
+        json = MultiJson.load(request.body.read.to_s, symbolize_keys: true)
+        params.merge! json
+        puts params.inspect
+        session[:user_id] = params[:user_id]
+        200
+      end
+
+      app.get '/get' do
+        puts session[:user_id]
+        puts session.inspect
+      end
+
       routes.each do |route|
         route.each do |k, v|
           app.send(k.to_sym, "/#{api.name}/#{v["route"]}") do
@@ -36,6 +50,7 @@ module Playhouse
               end
               params.merge! json
             end
+            puts session[:user_id]
             settings.apis[api.name].send(v["command"].to_sym, params).to_json
           end 
         end
