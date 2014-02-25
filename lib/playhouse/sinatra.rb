@@ -1,9 +1,13 @@
 require 'playhouse/theatre'
+require 'playhouse/context'
 require 'playhouse/production'
 require 'playhouse/sinatra/api_builder'
 
 module Playhouse
   module Sinatra
+    class Auth < Playhouse::Context
+      actor :current_user
+    end
     def add_play theatre, play, routes=nil
       #theatre = Playhouse::Theatre.new(root: settings.root, environment: settings.environment)
       theatre.while_open do
@@ -25,18 +29,15 @@ module Playhouse
     #    params: '*world'
     #    description: hello world
     def set_routes(api, app, routes)
-      puts "SETTING ROUTES"
-      app.post '/set' do
-        json = MultiJson.load(request.body.read.to_s, symbolize_keys: true)
+      app.post '/cobudget/set_user' do
+        json ||= begin
+          MultiJson.load(request.body.read.to_s, symbolize_keys: true)
+        rescue MultiJson::LoadError
+          {}
+        end
         params.merge! json
-        puts params.inspect
         session[:user_id] = params[:user_id]
         200
-      end
-
-      app.get '/get' do
-        puts session[:user_id]
-        puts session.inspect
       end
 
       routes.each do |route|
@@ -50,11 +51,12 @@ module Playhouse
               end
               params.merge! json
             end
-            puts session[:user_id]
-            settings.apis[api.name].send(v["command"].to_sym, params).to_json
+            auth = Auth.new current_user: session['user_id']
+            settings.apis[api.name].send("#{v["command"]}_with_parent".to_sym, auth, params).to_json
           end 
         end
       end 
+
       app.get '/routes' do
         str = ""
         routes.each do |route| 
